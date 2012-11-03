@@ -21,7 +21,7 @@ import os
 import urllib2
 if not os.path.exists('Humor-Sans.ttf'):
     fhandle = urllib2.urlopen('http://antiyawn.com/uploads/Humor-Sans.ttf')
-    open('Humor-Sans.ttf', 'wb').write(fhandle.read())
+    open('Humor-Sans.ttf', 'w').write(fhandle.read())
 
     
 def xkcd_line(x, y, xlim=None, ylim=None,
@@ -108,7 +108,13 @@ def XKCDify(ax, mag=1.0,
             xaxis_arrow='+',
             yaxis_arrow='+',
             ax_extend=0.1,
-            expand_axes=False):
+            expand_axes=False,
+            ticks=False,
+            xticks_inside=False,
+            yticks_inside=False,
+            xlabel_inside=False,
+            ylabel_inside=False,
+            ):
     """Make axis look hand-drawn
 
     This adjusts all lines, text, legends, and axes in the figure to look
@@ -163,10 +169,10 @@ def XKCDify(ax, mag=1.0,
                       linestyle='-', color='k')
 
     # Label axes3, 0.5, 'hello', fontsize=14)
-    ax.text(xax_lim[1], xaxis_loc - 0.02 * yspan, ax.get_xlabel(),
-            fontsize=14, ha='right', va='top', rotation=12)
-    ax.text(yaxis_loc - 0.02 * xspan, yax_lim[1], ax.get_ylabel(),
-            fontsize=14, ha='right', va='top', rotation=78)
+    ax.text(xax_lim[1], xaxis_loc - 0.08 * yspan * (2 * xlabel_inside - 1), ax.get_xlabel(),
+            fontsize=14, ha='right', va='bottom' if xlabel_inside else 'top', rotation=0)
+    ax.text(yaxis_loc + 0.04 * xspan * (2 * ylabel_inside - 1), yax_lim[1], ax.get_ylabel(),
+            fontsize=14, ha='right', va='bottom' if ylabel_inside else 'top', rotation=84)
     ax.set_xlabel('')
     ax.set_ylabel('')
 
@@ -181,30 +187,31 @@ def XKCDify(ax, mag=1.0,
 
     for line in lines:
         x, y = line.get_data()
-
-        x_int, y_int = xkcd_line(x, y, xlim, ylim,
+        ls = line.get_linestyle()
+        if ls != 'None':
+            x_int, y_int = xkcd_line(x, y, xlim, ylim,
                                  mag, f1, f2, f3)
-
+        else:
+            x_int, y_int = x, y
         # create foreground and background line
         lw = line.get_linewidth()
         line.set_linewidth(2 * lw)
         line.set_data(x_int, y_int)
 
         # don't add background line for axes
-        if (line is not xaxis) and (line is not yaxis):
+        if (line is not xaxis) and (line is not yaxis) and ls != 'None':
             line_bg = pl.Line2D(x_int, y_int, color=bgcolor,
-                                linewidth=8 * lw)
-
+                                linewidth=2 * lw + 4)
             ax.add_line(line_bg)
         ax.add_line(line)
 
     # Draw arrow-heads at the end of axes lines
-    arr1 = 0.03 * np.array([-1, 0, -1])
-    arr2 = 0.02 * np.array([-1, 0, 1])
+    arr1 = 0.04 * np.array([-1, 0, -1])
+    arr2 = 0.03 * np.array([-1, 0, 1])
 
-    arr1[::2] += np.random.normal(0, 0.005, 2)
-    arr2[::2] += np.random.normal(0, 0.005, 2)
-
+    arr1[::2] += np.random.normal(0, 0.005 / 2, 2)
+    arr2[::2] += np.random.normal(0, 0.005 / 2, 2)
+    
     x, y = xaxis.get_data()
     if '+' in str(xaxis_arrow):
         ax.plot(x[-1] + arr1 * xspan * aspect,
@@ -217,13 +224,31 @@ def XKCDify(ax, mag=1.0,
 
     x, y = yaxis.get_data()
     if '+' in str(yaxis_arrow):
-        ax.plot(x[-1] + arr2 * xspan * aspect,
-                y[-1] + arr1 * yspan,
+        ax.plot(x[-1] + arr2 * xspan * aspect**2,
+                y[-1] + arr1 * yspan / aspect,
                 color='k', lw=2)
     if '-' in str(yaxis_arrow):
-        ax.plot(x[0] - arr2 * xspan * aspect,
-                y[0] - arr1 * yspan,
+        ax.plot(x[0] - arr2 * xspan * aspect**2,
+                y[0] - arr1 * yspan / aspect,
                 color='k', lw=2)
+
+    # Set the axis limits
+    ax.set_xlim(xax_lim[0] - 0.1 * xspan,
+                xax_lim[1] + 0.1 * xspan)
+    ax.set_ylim(yax_lim[0] - 0.1 * yspan,
+                yax_lim[1] + 0.1 * yspan)
+
+    # adjust the axes
+    if ticks:
+        for x,xtext in zip(ax.get_xticks(), ax.get_xticklabels()):
+            ax.text(x, xaxis_loc - 0.08 * yspan * (2 * xticks_inside - 1), xtext.get_text(),
+                fontsize=10, ha='center', va='bottom' if xticks_inside else 'top', rotation=0)
+        for y,ytext in zip(ax.get_yticks(), ax.get_yticklabels()):
+            ax.text(yaxis_loc + 0.02 * xspan * (2 * yticks_inside - 1), y, ytext.get_text(),
+                fontsize=10, ha='left' if yticks_inside else 'right', va='center', rotation=0)
+    
+    ax.set_xticks([])
+    ax.set_yticks([])      
 
     # Change all the fonts to humor-sans.
     prop = fm.FontProperties(fname='Humor-Sans.ttf', size=16)
@@ -243,15 +268,6 @@ def XKCDify(ax, mag=1.0,
             if isinstance(child, pl.Text):
                 child.set_fontproperties(prop)
     
-    # Set the axis limits
-    ax.set_xlim(xax_lim[0] - 0.1 * xspan,
-                xax_lim[1] + 0.1 * xspan)
-    ax.set_ylim(yax_lim[0] - 0.1 * yspan,
-                yax_lim[1] + 0.1 * yspan)
-
-    # adjust the axes
-    ax.set_xticks([])
-    ax.set_yticks([])      
 
     if expand_axes:
         ax.figure.set_facecolor(bgcolor)
@@ -259,3 +275,32 @@ def XKCDify(ax, mag=1.0,
         ax.set_position([0, 0, 1, 1])
     
     return ax
+
+if __name__ == '__main__':
+	#np.random.seed(0)
+	import pylab
+	import scipy.stats
+	ax = pylab.axes()
+
+	x = np.linspace(0, 10, 100)
+	ax.plot(x, np.sin(x) * np.exp(-0.1 * (x - 5) ** 2), 'b', lw=1, label='damped sine')
+	ax.plot(x, -np.cos(x) * np.exp(-0.1 * (x - 5) ** 2), 'r', lw=1, label='damped cosine')
+	ax.plot(x, scipy.stats.norm.pdf(x, 5, 1), 'g', lw=1, label='gaussian')
+
+	ax.set_title('Noice plot yo!')
+	ax.set_xlabel('invariant')
+	ax.set_ylabel('variable')
+
+	ax.legend(bbox_to_anchor=(1.15,0.4), ncol=1, handlelength=0)
+	#ax.legend(loc='lower right', handlelength=0)
+
+	#ax.set_xlim(0, 10)
+	#ax.set_ylim(-1.0, 1.0)
+
+	#XKCDify the axes -- this operates in-place
+	XKCDify(ax, xaxis_loc=0.0, yaxis_loc=0.0,
+		xaxis_arrow='+-', yaxis_arrow='+-',
+		expand_axes=True)
+	ax.set_position([0, 0, 0.92, 1])
+	pylab.savefig("xkcdplot.pdf") #, bbox_inches='tight')
+
